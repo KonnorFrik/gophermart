@@ -1,10 +1,9 @@
 package api
 
 import (
-	"encoding/base64"
 	"log"
 	"net/http"
-	"strings"
+
     "gophermart/model"
 
 	"github.com/gin-gonic/gin"
@@ -33,20 +32,11 @@ var secretKey = []byte("aBoBa")
 // Register - create a new user
 // TODO: now it create a user in memory, need to use db
 func Register(c *gin.Context) {
-    var user model.User
-    err := c.ShouldBindBodyWithJSON(&user)
+    user, ok := postAuthCredentials(c)
 
-    if err != nil || user.Login == "" || user.Password == "" {
-        log.Printf("[REGISTER]: Error on binding: %v\n", err)
+    if !ok || user.Login == "" || user.Password == "" {
+        log.Printf("[REGISTER]: Error on get user credentials\n")
         c.JSON(http.StatusBadRequest, gin.H{})
-        return
-    }
-
-    userDB, err := model.NewUser(user.Login, user.Password, "")
-
-    if err != nil {
-        log.Printf("[REGISTER]: %v: %q\n", err, user.Login)
-        c.JSON(http.StatusConflict, gin.H{})
         return
     }
 
@@ -57,60 +47,43 @@ func Register(c *gin.Context) {
     str, err := tok.SignedString(secretKey)
 
     if err != nil {
-        log.Printf("[REGISTER]: Error on signing: %v\n", err)
+        log.Printf("[REGISTER]: Error on signing token: %q\n", err)
         c.JSON(http.StatusInternalServerError, gin.H{})
         return
     }
 
-    userDB.Token = str
+    _, err = model.NewUser(user.Login, user.Password, str)
+
+    if err != nil {
+        if err == model.ErrUserAlreadyExist {
+            log.Printf("[REGISTER]: already exist %q\n", user.Login)
+            c.JSON(http.StatusConflict, gin.H{})
+            return
+        }
+
+        log.Printf("[REGISTER]: Unknown error: %q\n", err)
+        c.JSON(http.StatusInternalServerError, gin.H{})
+        return
+    }
+
     c.SetCookie("jwt", str, 3600, "/", "", false, true)
     c.JSON(http.StatusOK, gin.H{})
 }
 
+// userDBbyCreadentials - Returns user from DB by login
 func userDBbyCreadentials(login, password string) (*model.User, bool) {
     user, err := model.UserByLogin(login)
 
     if err != nil || user.Password != password {
-        log.Printf("[LOGIN]: %v: %q\n", err, login)
+        log.Printf("[LOGIN]: Error: %q: %q, is password good? %t\n", err, login, user.Password == password)
         return nil, false
     }
 
     return user, true
 }
 
-// basicAuthCredentials - returns User type from pair login:password from basic auth or false
-func basicAuthCredentials(headerAuthString string) (*model.User, bool) {
-    if len(headerAuthString) == 0 {
-        return nil, false
-    }
 
-    headerSplitted := strings.Split(headerAuthString, " ")
-
-    if len(headerSplitted) != 2 || headerSplitted[0] != "Basic" {
-        log.Printf("[LOGIN/basicAuth]: Wrong data: %q\n", headerAuthString)
-        return nil, false
-    }
-
-    // BUG: can't decode pair "admin:admin"
-    credPair, err := base64.RawStdEncoding.DecodeString(headerSplitted[1])
-
-    if err != nil {
-        log.Printf("[LOGIN/basicAuth]: Error on decode: %q %v\n", headerAuthString, err)
-        return nil, false
-    }
-
-    credPairSplitted := strings.Split(string(credPair), ":")
-
-    if len(credPairSplitted) != 2 {
-        log.Printf("[LOGIN/basicAuth]: Wrong pair: %q\n", credPair)
-        return nil, false
-    }
-
-    login, password := credPairSplitted[0], credPairSplitted[1]
-    return userDBbyCreadentials(login, password)
-}
-
-// basicAuthCredentials - returns User type from login:password of post body or false
+// postAuthCredentials - returns User type from post body or false
 func postAuthCredentials(c *gin.Context) (*model.User, bool) {
     var user model.User
     err := c.ShouldBindBodyWithJSON(&user)
@@ -120,18 +93,21 @@ func postAuthCredentials(c *gin.Context) (*model.User, bool) {
         return nil, false
     }
 
-    return userDBbyCreadentials(user.Login, user.Password)
+    return &user, true
 }
 
 func Login(c *gin.Context) {
-    var userDB *model.User
+    var user *model.User
     var ok bool
 
-    userDB, ok = postAuthCredentials(c)
+    user, ok = postAuthCredentials(c)
 
     if !ok {
-        userDB, ok = basicAuthCredentials(c.GetHeader("Authorization"))
+        c.JSON(http.StatusUnauthorized, gin.H{})
+        return
     }
+
+    userDB, ok := userDBbyCreadentials(user.Login, user.Password)
 
     if !ok {
         c.JSON(http.StatusUnauthorized, gin.H{})
@@ -159,7 +135,7 @@ func Delete(c *gin.Context) {
         return
     }
 
-    userDB, ok := postAuthCredentials(c)
+    user, ok := postAuthCredentials(c)
 
     if !ok {
         log.Printf("[/user/delete]: no credentials\n")
@@ -167,12 +143,22 @@ func Delete(c *gin.Context) {
         return
     }
 
+    userDB, ok := userDBbyCreadentials(user.Login, user.Password)
+
     if userDB.Token != cookie {
         log.Printf("[/user/delete]: no credentials\n")
         c.JSON(http.StatusBadRequest, gin.H{})
         return
     }
 
-    model.DeleteUser(userDB.Login)
+    err = model.DeleteUser(userDB)
+
+    if err != nil {
+        log.Printf("[/user/delete]: error from model: %q\n", err)
+        c.JSON(http.StatusInternalServerError, gin.H{})
+        return
+    }
+
+    c.SetCookie("jwt", "", -1, "/", "", false, true)
     c.JSON(http.StatusOK, gin.H{})
 }
