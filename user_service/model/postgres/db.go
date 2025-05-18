@@ -1,8 +1,3 @@
-/*
-Connection manager
-Package for store database object as singletone
-Has auto reconnection, connection retries will be until connect is success
-*/
 package postgres
 
 import (
