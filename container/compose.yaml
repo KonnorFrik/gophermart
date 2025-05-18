@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_PASSWORD: $DB_PASS
       POSTGRES_USER: $DB_USER
-      POSTGRES_DB: "gophermart"
+      POSTGRES_DB: $DB_DB
     volumes:
       - ../postgres_db:/var/lib/postgresql/data
     ports:
@@ -23,6 +23,9 @@ services:
     environment:
       DB_USER: $DB_USER
       DB_PASS: $DB_PASS
+      DB_DB: $DB_DB
+      DB_HOST: $DB_HOST
+      DB_PORT: $DB_PORT
     hostname: gophermart
     ports:
       - "8080:8080"
