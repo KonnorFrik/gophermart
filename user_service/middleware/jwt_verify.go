@@ -14,6 +14,7 @@ import (
 
 var (
     jwtSecretKey = []byte(os.Getenv("JWT_SECRET_KEY"))
+
     ErrInvalidToken = errors.New("invalid token")
 )
 
@@ -50,10 +51,6 @@ func JWTAuthenticate(c *gin.Context) {
     }
     
     userIDstr, err := mapClaims.GetSubject()
-    // {
-    //     uidStr, ok := mapClaims["sub"]
-    //     log.Printf("[jwtAuthMDLWR]: RAW ACCESS 'sub': %q, %t\n", uidStr, ok)
-    // }
 
     if err != nil {
         log.Printf("[jwtAuthMDLWR]: Can't get subject claim: %q\n", err)
@@ -61,16 +58,24 @@ func JWTAuthenticate(c *gin.Context) {
         return
     }
 
-    userID, err := strconv.ParseUint(userIDstr, 10, strconv.IntSize)
+    cookieUID, err := c.Cookie("uid")
 
-    if err != nil {
-        log.Printf("[jwtAuthMDLWR]: Can't convert id to int: %q\n", err)
+    if cookieUID != userIDstr {
+        log.Printf("[jwtAuthMDLWR]: Cookie id does not math jwt id\n")
         c.AbortWithStatus(http.StatusUnauthorized)
         return
     }
 
-    log.Printf("[jwtAuthMDLWR]: Set user id into context: %d\n", userID)
-    c.Set("userID", uint(userID))
+    // userID, err := strconv.ParseUint(userIDstr, 10, strconv.IntSize)
+    //
+    // if err != nil {
+    //     log.Printf("[jwtAuthMDLWR]: Can't convert id to int: %q\n", err)
+    //     c.AbortWithStatus(http.StatusUnauthorized)
+    //     return
+    // }
+
+    // log.Printf("[jwtAuthMDLWR]: Set user id into context: %d\n", userID)
+    // c.Set("userID", uint(userID))
     c.Next()
 }
 
