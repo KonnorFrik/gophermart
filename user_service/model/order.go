@@ -1,8 +1,11 @@
 package model
 
 import (
+	"cmp"
 	"errors"
 	"log"
+	"slices"
+	"sort"
 	"time"
 
 	"gorm.io/gorm"
@@ -23,12 +26,12 @@ var (
 type Status int
 
 type Order struct {
-    ID         uint      `gorm:"primarykey"`
-	Accrual    uint
-    Number     string    `gorm:"unique"`
-	Status     Status    `gorm:"type:bigint"`
-	UploadedAt time.Time `gorm:"autoCreateTime"`
-    UserID     uint
+    ID         uint      `gorm:"primarykey" json:"-"`
+    Accrual    uint      `json:"accrual"`
+    Number     string    `gorm:"unique" json:"number"`
+    Status     Status    `gorm:"type:bigint" json:"status"`
+    UploadedAt time.Time `gorm:"autoCreateTime" json:"uploaded_at"`
+    UserID     uint      `json:"-"`
 }
 
 func (s Status) String() string {
@@ -73,4 +76,30 @@ func NewOrder(order *Order, user *User) error {
     }
 
     return nil
+}
+
+func OrdersRelated(user *User) ([]Order, error) {
+    if user == nil {
+        return nil, errors.New("user is nil, can't get orders related to nothing")
+    }
+
+    if dbObj == nil {
+        log.Printf("[model.Order/OrdersRelated]: Lost connection to DB\n")
+        connectToPostgres()
+        return nil, ErrDataBaseNotConnected
+    }
+
+    var orders []Order
+    err := dbObj.Model(user).Association("Orders").Find(&orders)
+
+    if err != nil {
+        log.Printf("[model.Order/OrdersRelated]: Error on find related: %q\n", err)
+        return nil, err
+    }
+
+    sort.SliceStable(orders, func(i, j int) bool {
+        return orders[j].UploadedAt.Before(orders[i].UploadedAt)
+    })
+
+    return orders, nil
 }
