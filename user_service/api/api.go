@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"unicode"
 
 	"gophermart/model"
@@ -60,7 +61,8 @@ func UserRegister(c *gin.Context) {
         return
     }
 
-    log.Printf("[/register]: Register new user with ID=%d\n", userDB.ID)
+    uid := strconv.FormatUint(uint64(userDB.ID), 10)
+    c.SetCookie("uid", uid, 3600, "/", "", false, true)
     c.JSON(http.StatusOK, gin.H{
         "token": strToken,
     })
@@ -89,6 +91,8 @@ func UserLogin(c *gin.Context) {
         return
     }
 
+    uid := strconv.FormatUint(uint64(userDB.ID), 10)
+    c.SetCookie("uid", uid, 3600, "/", "", false, true)
     c.JSON(http.StatusOK, gin.H{
         "token": strToken,
     })
@@ -125,11 +129,20 @@ func UserDelete(c *gin.Context) {
 // Create a new order
 // accept text/plain
 func NewOrder(c *gin.Context) {
-    userID := c.GetUint("userID")
+    // userIDstr, err := c.Cookie("uid")
+    //
+    // if err != nil {
+    //     log.Printf("[POST /orders]: uid missed in cookie: %q\n", err)
+    //     c.Status(http.StatusUnauthorized)
+    //     return
+    // }
+    //
+    // userID64, err := strconv.ParseUint(userIDstr, 10, strconv.IntSize)
+    userID, err := UintFromCookie(c, "uid")
 
-    if userID == 0 {
-        log.Printf("[POST /orders]: UserID is zero from context\n")
-        c.Status(http.StatusInternalServerError)
+    if err != nil {
+        log.Printf("[POST /orders]: invalid uid from cookie: %q\n", err)
+        c.Status(http.StatusUnauthorized)
         return
     }
 
@@ -163,10 +176,10 @@ func NewOrder(c *gin.Context) {
         return
     }
 
-    order := &model.Order{
+    order := model.Order{
         Number: orderString,
     }
-    err = model.NewOrder(order, &model.User{ID: userID})
+    err = model.NewOrder(&order, &model.User{ID: userID})
 
     switch {
     case errors.Is(err, model.ErrDataBaseNotConnected):
@@ -186,9 +199,21 @@ func NewOrder(c *gin.Context) {
 }
 
 func AllOrders(c *gin.Context) {
-    userID := c.GetUint("userID")
+    userID, err := UintFromCookie(c, "uid")
 
-    if userID == 0 {
-        log.Printf("[GET /orders]: UserID is zero from context\n")
+    if err != nil {
+        log.Printf("[GET /orders]: invalid uid from cookie: %q\n", err)
+        c.Status(http.StatusUnauthorized)
+        return
     }
+
+    orders, err := model.OrdersRelated(&model.User{ID: userID})
+
+    if err != nil {
+        log.Printf("[GET /orders]: Error on fetch data: %q\n", err)
+        c.Status(http.StatusInternalServerError)
+        return
+    }
+
+    c.JSON(http.StatusOK, orders)
 }

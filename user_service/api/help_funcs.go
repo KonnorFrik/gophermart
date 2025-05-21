@@ -47,6 +47,7 @@ func userDBbyCreadentials(login, password string) (*model.User, bool) {
     }
 
     // TODO: use crypted password and related validation
+    // TODO: Create method .ValidCred for User type
     if user.Password != password {
         log.Printf("[LOGIN]: %q: wrong password\n", login)
         return nil, false
@@ -57,4 +58,24 @@ func userDBbyCreadentials(login, password string) (*model.User, bool) {
 
 func validByLUHN(numbers string) bool {
     return len(numbers) > 0
+}
+
+type cookieGetter interface {
+    Cookie(string) (string, error)
+}
+
+func UintFromCookie(cg cookieGetter, key string) (uint, error) {
+    value, err := cg.Cookie(key)
+
+    if err != nil {
+        return 0, err
+    }
+
+    value64, err := strconv.ParseUint(value, 10, strconv.IntSize)
+
+    if err != nil {
+        return 0, err
+    }
+
+    return uint(value64), nil
 }
