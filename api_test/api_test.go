@@ -13,6 +13,9 @@ const (
     proto = "http"
     ip = "localhost"
     port = 8080
+
+    userLogin = "user"
+    userPassw = "user"
 )
 
 var (
@@ -20,33 +23,37 @@ var (
     address = fmt.Sprintf("%s://%s:%d", proto, ip, port)
 )
 
-type chainFunc func(*testing.T, string) string
+// funcs types
+// producers : only return args (token, cookies)
+// middlers : consume args and return data (token, cookies)
+// full-consumers : only accept args (token cookies)
+type chainFunc func(*testing.T, string, []*http.Cookie) (string, []*http.Cookie)
 
 // Run testUserRegister for get token
 // pass token to all given funcs and overwrite it with return value (may be same)
 // at end call testUserDelete
 func runChain(t *testing.T, chain ...chainFunc) {
-    token := testUserRegister(t)
+    token, cookies := testUserRegister(t)
 
     for _, f := range chain {
-        token = f(t, token)
+        token, cookies = f(t, token, cookies)
     }
 
-    testUserDelete(t, token)
+    testUserDelete(t, token, cookies)
 }
 
 func TestUserCRUD(t *testing.T) {
-    token := testUserRegister(t)
-    token = testUserLogin(t, token)
-    testUserDelete(t, token)
+    testUserRegister(t)
+    token, cookies := testUserLogin(t)
+    testUserDelete(t, token, cookies)
 }
 
 // return a token string after registration
-func testUserRegister(t *testing.T) string {
+func testUserRegister(t *testing.T) (string, []*http.Cookie) {
     req := client.R()
     req.SetBody(map[string]string{
-        "login": "user",
-        "password": "user",
+        "login": userLogin,
+        "password": userPassw,
     })
     response, err := req.Post(address + "/api/user/register")
 
@@ -79,16 +86,16 @@ func testUserRegister(t *testing.T) string {
         t.Errorf("Wrong body struct %v\n", result)
     }
 
-    return token
+    return token, response.Cookies()
 }
 
-func testUserLogin(t *testing.T, token string) string {
+func testUserLogin(t *testing.T) (string, []*http.Cookie) {
     req := client.R().SetBody(
         map[string]string{
-            "login": "user",
-            "password": "user",
+            "login": userLogin,
+            "password": userPassw,
         },
-    ).SetHeader("Authorization", token)
+    )
 
     response, err := req.Post(address + "/api/user/login")
 
@@ -121,16 +128,16 @@ func testUserLogin(t *testing.T, token string) string {
         t.Errorf("Wrong body struct %v\n", result)
     }
 
-    return token
+    return token, response.Cookies()
 }
 
-func testUserDelete(t *testing.T, token string) {
+func testUserDelete(t *testing.T, token string, cookies []*http.Cookie) {
     req := client.R().SetBody(
         map[string]string{
-            "login": "user",
-            "password": "user",
+            "login": userLogin,
+            "password": userPassw,
         },
-    ).SetHeader("Authorization", token)
+    ).SetHeader("Authorization", token).SetCookies(cookies)
 
     response, err := req.Delete(address + "/api/user/delete")
 
@@ -149,13 +156,12 @@ func testUserDelete(t *testing.T, token string) {
 func TestOrderCRUD(t *testing.T) {
     runChain(
         t,
-        testUserLogin,
         testCreateOrder,
     )
 }
 
-func testCreateOrder(t *testing.T, token string) string {
-    req := client.R().SetHeader("Authorization", token)
+func testCreateOrder(t *testing.T, token string, cookies []*http.Cookie) (string, []*http.Cookie) {
+    req := client.R().SetHeader("Authorization", token).SetCookies(cookies)
     req = req.SetBody("1234")
     response, err := req.Post(address + "/api/user/orders")
 
@@ -170,5 +176,5 @@ func testCreateOrder(t *testing.T, token string) string {
         t.Errorf("Got = %d, Want = %d\n", statusCode, wantStatus)
     }
 
-    return token
+    return token, response.Cookies()
 }
