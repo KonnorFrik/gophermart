@@ -1,11 +1,11 @@
 package postgres
 
 import (
-    "errors"
-    "fmt"
+	"context"
+	"errors"
+	"fmt"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -16,15 +16,15 @@ var (
 )
 
 // Connect - connect to db with specified config which must be not nil
-func Connect(config *DbConfig) (*gorm.DB, error) {
+func Connect(config *DbConfig) (*pgx.Conn, error) {
     if !config.isValid() {
         return nil, ErrInvalidConfig
     }
 
-    var db *gorm.DB
+    var db *pgx.Conn
     var err error
     connectionInfo := config.String()
-    db, err = gorm.Open(postgres.Open(connectionInfo), &gorm.Config{})
+    db, err = pgx.Connect(context.Background(), connectionInfo)
 
     if err != nil {
         return nil, err

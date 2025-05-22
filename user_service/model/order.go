@@ -1,12 +1,13 @@
 package model
 
 import (
+	"context"
 	"errors"
+	"gophermart/model/models"
 	"log"
 	"sort"
-	"time"
 
-	"gorm.io/gorm"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -22,15 +23,6 @@ var (
 )
 
 type Status int
-
-type Order struct {
-    ID         uint      `gorm:"primarykey" json:"-"`
-    Accrual    uint      `json:"accrual"`
-    Number     string    `gorm:"unique" json:"number"`
-    Status     Status    `gorm:"type:bigint" json:"status"`
-    UploadedAt time.Time `gorm:"autoCreateTime" json:"uploaded_at"`
-    UserID     uint      `json:"-"`
-}
 
 func (s Status) String() string {
     switch s {
@@ -48,7 +40,7 @@ func (s Status) String() string {
     }
 }
 
-func NewOrder(order *Order, user *User) error {
+func NewOrder(order *models.Order, user *models.User) error {
     if order == nil || len(order.Number) == 0 {
         return ErrOrderNothingToCreate
     }
@@ -59,24 +51,22 @@ func NewOrder(order *Order, user *User) error {
         return ErrDataBaseNotConnected
     }
 
-    // log.Printf("[model.Order/NewOrder]: Create a new order(%+v) for user(%+v)\n", order, user)
-    var err error
-    err = dbObj.Model(user).Association("Orders").Append(order)
-
-    if errors.Is(err, gorm.ErrDuplicatedKey) {
-        log.Printf("[model.Order/NewOrder]: Order already exist: %q\n", order.Number)
-        return ErrOrderAlreadyExist
-    }
+    queries := models.New(dbObj)
+    _, err := queries.CreateOrder(context.Background(), models.CreateOrderParams{
+        Number: order.Number,
+        UserID: pgtype.Int8{Int64: user.ID, Valid: true},
+    })
 
     if err != nil {
         log.Printf("[model.Order/NewOrder]: Error on Create: %q\n", err)
         return err
     }
 
+    // log.Printf("[model.Order/NewOrder]: Create new order#%q, for user(%d)\n", order.Number, user.ID)
     return nil
 }
 
-func OrdersRelated(user *User) ([]Order, error) {
+func OrdersRelated(user *models.User) ([]models.Order, error) {
     if user == nil {
         return nil, errors.New("user is nil, can't get orders related to nothing")
     }
@@ -87,8 +77,8 @@ func OrdersRelated(user *User) ([]Order, error) {
         return nil, ErrDataBaseNotConnected
     }
 
-    var orders []Order
-    err := dbObj.Model(user).Association("Orders").Find(&orders)
+    queries := models.New(dbObj)
+    orders, err := queries.UserOrders(context.Background(), pgtype.Int8{Int64: user.ID, Valid: true})
 
     if err != nil {
         log.Printf("[model.Order/OrdersRelated]: Error on find related: %q\n", err)
@@ -96,8 +86,11 @@ func OrdersRelated(user *User) ([]Order, error) {
     }
 
     sort.SliceStable(orders, func(i, j int) bool {
-        return orders[j].UploadedAt.Before(orders[i].UploadedAt)
+        return orders[j].UploadedAt.Time.Before(orders[i].UploadedAt.Time)
     })
 
     return orders, nil
 }
+
+// TODO: delete order by it id/number 
+// TODO: delete all orders belongs to specific user

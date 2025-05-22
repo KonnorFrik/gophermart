@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -66,16 +65,6 @@ func JWTAuthenticate(c *gin.Context) {
         return
     }
 
-    // userID, err := strconv.ParseUint(userIDstr, 10, strconv.IntSize)
-    //
-    // if err != nil {
-    //     log.Printf("[jwtAuthMDLWR]: Can't convert id to int: %q\n", err)
-    //     c.AbortWithStatus(http.StatusUnauthorized)
-    //     return
-    // }
-
-    // log.Printf("[jwtAuthMDLWR]: Set user id into context: %d\n", userID)
-    // c.Set("userID", uint(userID))
     c.Next()
 }
 

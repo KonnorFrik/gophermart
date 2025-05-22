@@ -2,6 +2,7 @@ package api
 
 import (
 	"gophermart/model"
+	"gophermart/model/models"
 	"log"
 	"strconv"
 	"time"
@@ -10,8 +11,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func createToken(user *model.User) (string, error) {
-    userIDstr := strconv.FormatUint(uint64(user.ID), 10)
+func createToken(user *models.User) (string, error) {
+    userIDstr := strconv.FormatInt(user.ID, 10)
     tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
         "iss": "gophermart",
         "sub": userIDstr,
@@ -20,13 +21,13 @@ func createToken(user *model.User) (string, error) {
     })
     str, err := tok.SignedString(jwtSecretKey)
 
-    log.Printf("[createToken]: Create token with 'sub'=user ID= %q\n", userIDstr)
+    log.Printf("[createToken]: Create token with 'sub'=%q\n", userIDstr)
     return str, err
 }
 
 // postAuthCredentials - returns User type from post body.
-func postAuthCredentials(c *gin.Context) (*model.User, bool) {
-    var user model.User
+func postAuthCredentials(c *gin.Context) (*models.User, bool) {
+    var user models.User
     err := c.ShouldBindBodyWithJSON(&user)
 
     if err != nil || user.Login == "" || user.Password == "" {
@@ -38,7 +39,7 @@ func postAuthCredentials(c *gin.Context) (*model.User, bool) {
 }
 
 // userDBbyCreadentials - Returns user from DB by login
-func userDBbyCreadentials(login, password string) (*model.User, bool) {
+func userDBbyCreadentials(login, password string) (*models.User, bool) {
     user, err := model.UserByLogin(login)
 
     if err != nil {
@@ -60,22 +61,12 @@ func validByLUHN(numbers string) bool {
     return len(numbers) > 0
 }
 
-type cookieGetter interface {
-    Cookie(string) (string, error)
-}
-
-func UintFromCookie(cg cookieGetter, key string) (uint, error) {
-    value, err := cg.Cookie(key)
+func Int64(value string) (int64, error) {
+    value64, err := strconv.ParseInt(value, 10, strconv.IntSize)
 
     if err != nil {
         return 0, err
     }
 
-    value64, err := strconv.ParseUint(value, 10, strconv.IntSize)
-
-    if err != nil {
-        return 0, err
-    }
-
-    return uint(value64), nil
+    return value64, nil
 }

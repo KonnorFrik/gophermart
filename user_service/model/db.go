@@ -6,11 +6,11 @@ import (
 	"log"
 	"os"
 
-    // pgx
-    // sqlc - https://github.com/sqlc-dev/sqlc
-    // https://github.com/doug-martin/goqu
-    // migrations
-	"gorm.io/gorm"
+	"github.com/jackc/pgx/v5"
+	// pgx
+	// sqlc - https://github.com/sqlc-dev/sqlc
+	// https://github.com/doug-martin/goqu
+	// migrations
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 		TimeZone: "Asia/Yekaterinburg",
 	}
 
-	dbObj *gorm.DB
+	dbObj *pgx.Conn
     ErrDataBaseNotConnected = errors.New("database is not connected")
 )
 
@@ -38,25 +38,15 @@ func connectToPostgres() {
 
 	if err != nil {
 		if errors.Is(err, db.ErrInvalidConfig) {
-			log.Printf("[model]: Config is invalid: %q\n", config)
-
-		} else {
-			// need to ...
+			log.Printf("[db]: Config is invalid: %q\n", config)
+            return
 		}
+        // need to process other errors
 
+        log.Printf("[db]: Got unknown error on connect: %q\n", err)
 		return
 	}
 
-	if err = dbObj.AutoMigrate(&User{}); err != nil {
-		log.Printf("[model]: Error on migrate User: %q\n", err)
-		return
-	}
-	
-	if err = dbObj.AutoMigrate(&Order{}); err != nil {
-		log.Printf("[model]: Error on migrate Order: %q\n", err)
-		return
-	}
-
-	log.Printf("[model]: Database connected\n")
+	log.Printf("[db]: Database connected\n")
 }
 

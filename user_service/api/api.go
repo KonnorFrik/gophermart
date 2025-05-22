@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"gophermart/model"
+	"gophermart/model/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -99,26 +100,49 @@ func UserLogin(c *gin.Context) {
 }
 
 func UserDelete(c *gin.Context) {
+    cookieUID, err := c.Cookie("uid")
+
+    if err != nil {
+        log.Printf("[DELETE /user]: missed cookie\n")
+        c.Status(http.StatusUnauthorized)
+        return
+    }
+
+    userID, err := Int64(cookieUID)
+
+    if err != nil {
+        log.Printf("[DELETE /user]: invalid uid from cookie: %q\n", err)
+        c.Status(http.StatusUnauthorized)
+        return
+    }
+
     user, ok := postAuthCredentials(c)
 
     if !ok {
-        log.Printf("[/user/delete]: no credentials\n")
+        log.Printf("[DELETE /user]: no credentials\n")
         c.Status(http.StatusBadRequest)
         return
     }
 
+    // validate creadentials
     userDB, ok := userDBbyCreadentials(user.Login, user.Password)
 
     if !ok {
-        log.Printf("[/user/delete]: Not found in DB\n")
+        log.Printf("[DELETE /user]: Not found in DB\n")
         c.Status(http.StatusBadRequest)
         return
     }
 
-    err := model.DeleteUser(userDB)
+    if userDB.ID != userID {
+        log.Printf("[DELETE /user]: Conflict: different id: DB(%d) != cookie(%d)\n", userDB.ID, userID)
+        c.Status(http.StatusConflict)
+        return
+    }
+
+    err = model.DeleteUser(userID)
 
     if err != nil {
-        log.Printf("[/user/delete]: error from model: %q\n", err)
+        log.Printf("[DELETE /user]: error from model: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
     }
@@ -129,16 +153,15 @@ func UserDelete(c *gin.Context) {
 // Create a new order
 // accept text/plain
 func NewOrder(c *gin.Context) {
-    // userIDstr, err := c.Cookie("uid")
-    //
-    // if err != nil {
-    //     log.Printf("[POST /orders]: uid missed in cookie: %q\n", err)
-    //     c.Status(http.StatusUnauthorized)
-    //     return
-    // }
-    //
-    // userID64, err := strconv.ParseUint(userIDstr, 10, strconv.IntSize)
-    userID, err := UintFromCookie(c, "uid")
+    cookieUID, err := c.Cookie("uid")
+
+    if err != nil {
+        log.Printf("[POST /orders]: missed cookie\n")
+        c.Status(http.StatusUnauthorized)
+        return
+    }
+
+    userID, err := Int64(cookieUID)
 
     if err != nil {
         log.Printf("[POST /orders]: invalid uid from cookie: %q\n", err)
@@ -176,30 +199,31 @@ func NewOrder(c *gin.Context) {
         return
     }
 
-    order := model.Order{
+    order := models.Order{
         Number: orderString,
     }
-    err = model.NewOrder(&order, &model.User{ID: userID})
+    err = model.NewOrder(&order, &models.User{ID: userID})
 
-    switch {
-    case errors.Is(err, model.ErrDataBaseNotConnected):
+    if err != nil {
+        log.Printf("[POST /orders]: Got err: %q\n", err)
         c.Status(http.StatusInternalServerError)
-    case errors.Is(err, model.ErrOrderNothingToCreate):
-        c.Status(http.StatusBadRequest)
-    case errors.Is(err, model.ErrOrderAlreadyExist):
-        // determine here who create that order 
-        // this user or other
-        c.Status(http.StatusOK)
-    case err != nil:
-        c.Status(http.StatusInternalServerError)
-
-    default:
-        c.Status(http.StatusAccepted)
+        return
     }
+
+    // log.Printf("[POST /orders]: #%q - accepted\n", orderString)
+    c.Status(http.StatusAccepted)
 }
 
 func AllOrders(c *gin.Context) {
-    userID, err := UintFromCookie(c, "uid")
+    cookieUID, err := c.Cookie("uid")
+
+    if err != nil {
+        log.Printf("[GET /orders]: missed cookie\n")
+        c.Status(http.StatusUnauthorized)
+        return
+    }
+
+    userID, err := Int64(cookieUID)
 
     if err != nil {
         log.Printf("[GET /orders]: invalid uid from cookie: %q\n", err)
@@ -207,7 +231,7 @@ func AllOrders(c *gin.Context) {
         return
     }
 
-    orders, err := model.OrdersRelated(&model.User{ID: userID})
+    orders, err := model.OrdersRelated(&models.User{ID: userID})
 
     if err != nil {
         log.Printf("[GET /orders]: Error on fetch data: %q\n", err)
@@ -217,3 +241,4 @@ func AllOrders(c *gin.Context) {
 
     c.JSON(http.StatusOK, orders)
 }
+

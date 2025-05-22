@@ -1,10 +1,10 @@
 package model
 
 import (
+	"context"
 	"errors"
+	"gophermart/model/models"
 	"log"
-
-	"gorm.io/gorm"
 )
 
 var (
@@ -12,16 +12,9 @@ var (
 	ErrUserDoesNotExist = errors.New("user does not exist")
 )
 
-type User struct {
-    ID       uint    `gorm:"primarykey"`
-	Login    string  `gorm:"unique"`
-	Password string
-	Orders   []Order `gorm:"constraint:OnDelete:CASCADE;"`
-}
-
-// TODO: pass a User type as arg
+// TODO: pass a models.CreateUserParams type as arg
 // and return just a error
-func NewUser(login, passw string) (*User, error) {
+func NewUser(login, passw string) (*models.User, error) {
 	if dbObj == nil {
 		log.Printf("[model.User/NewUser]: Lost connection to DB\n")
 		connectToPostgres()
@@ -29,30 +22,12 @@ func NewUser(login, passw string) (*User, error) {
 	}
 
 	var err error
+    queries := models.New(dbObj)
 
-	// var dummy User
-	// err = dbObj.Model(&User{}).First(&dummy).Error
-	//
-	// if err == nil {
-	//     log.Printf("[model.User/NewUser]: User already exist: %q\n", dummy.Login)
-	//     return nil, ErrUserAlreadyExist
-	// }
-	//
-	// if !errors.Is(err, gorm.ErrRecordNotFound) {
-	//     log.Printf("[model.User/NewUser]: Error on find user: %q\n", err)
-	//     return nil, err
-	// }
-
-	var user User = User{
-		Login:    login,
-		Password: passw,
-	}
-	err = dbObj.Model(&User{}).Create(&user).Error
-
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		log.Printf("[model.User/NewUser]: User already exist: %q\n", user.Login)
-		return nil, ErrUserAlreadyExist
-	}
+    user, err := queries.CreateUser(context.Background(), models.CreateUserParams{
+        Login: login,
+        Password: passw,
+    })
 
 	if err != nil {
 		log.Printf("[model.User/NewUser]: Error on Create: %q\n", err)
@@ -62,21 +37,15 @@ func NewUser(login, passw string) (*User, error) {
 	return &user, nil
 }
 
-func UserByLogin(login string) (*User, error) {
+func UserByLogin(login string) (*models.User, error) {
 	if dbObj == nil {
 		log.Printf("[model.User/UserByLogin]: Lost connection to DB\n")
 		connectToPostgres()
 		return nil, ErrDataBaseNotConnected
 	}
 
-	var user User
-	var err error
-	err = dbObj.Model(&User{}).First(&user, "login = ?", login).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Printf("[model.User/UserByLogin]: User does not exist: %q\n", login)
-		return nil, ErrUserDoesNotExist
-	}
+    queries := models.New(dbObj)
+    user, err := queries.UserByLogin(context.Background(), login)
 
 	if err != nil {
 		log.Printf("[model.User/UserByLogin]: Error: %q\n", err)
@@ -86,15 +55,15 @@ func UserByLogin(login string) (*User, error) {
 	return &user, nil
 }
 
-func DeleteUser(user *User) error {
+func DeleteUser(id int64) error {
 	if dbObj == nil {
 		log.Printf("[model.User/DeleteUser]: Lost connection to DB\n")
 		connectToPostgres()
 		return ErrDataBaseNotConnected
 	}
 
-	var err error
-	err = dbObj.Model(&User{}).Delete(user, "login = ?", user.Login).Error
+    queries := models.New(dbObj)
+    err := queries.DeleteUser(context.Background(), id)
 
 	if err != nil {
 		log.Printf("[model.User/DeleteUser]: Error on delete %q\n", err)
