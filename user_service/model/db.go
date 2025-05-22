@@ -6,6 +6,10 @@ import (
 	"log"
 	"os"
 
+    // pgx
+    // sqlc - https://github.com/sqlc-dev/sqlc
+    // https://github.com/doug-martin/goqu
+    // migrations
 	"gorm.io/gorm"
 )
 
