@@ -12,8 +12,6 @@ var (
 	ErrUserDoesNotExist = errors.New("user does not exist")
 )
 
-// TODO: pass a models.CreateUserParams type as arg
-// and return just a error
 func NewUser(login, passw string) (*models.User, error) {
 	if dbObj == nil {
 		log.Printf("[model.User/NewUser]: Lost connection to DB\n")
@@ -34,7 +32,7 @@ func NewUser(login, passw string) (*models.User, error) {
 		return nil, err
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 func UserByLogin(login string) (*models.User, error) {
@@ -52,7 +50,7 @@ func UserByLogin(login string) (*models.User, error) {
 		return nil, err
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 func DeleteUser(id int64) error {

@@ -31,7 +31,7 @@ func init() {
 	connectToPostgres()
 }
 
-// connect to postgres and make automigrate
+// connect to postgres
 func connectToPostgres() {
 	var err error
 	dbObj, err = db.Connect(config)

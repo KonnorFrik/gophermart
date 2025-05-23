@@ -6,42 +6,41 @@ import (
 	"gophermart/model/models"
 	"log"
 	"sort"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const (
-	statusNew Status = iota
-	statusProcessing
-	statusInvalid
-	statusProcessed
-)
 
 var (
     ErrOrderAlreadyExist = errors.New("order already exist")
     ErrOrderNothingToCreate = errors.New("nothing to create")
 )
 
-type Status int
+// const (
+// 	statusNew Status = iota
+// 	statusProcessing
+// 	statusInvalid
+// 	statusProcessed
+// )
 
-func (s Status) String() string {
-    switch s {
-    case statusNew:
-        return "NEW"
-    case statusProcessing:
-        return "PROCESSING"
-    case statusInvalid:
-        return "INVALID"
-    case statusProcessed:
-        return "PROCESSED"
-
-    default:
-        return ""
-    }
-}
+// type Status int
+//
+// func (s Status) String() string {
+//     switch s {
+//     case statusNew:
+//         return "NEW"
+//     case statusProcessing:
+//         return "PROCESSING"
+//     case statusInvalid:
+//         return "INVALID"
+//     case statusProcessed:
+//         return "PROCESSED"
+//
+//     default:
+//         return ""
+//     }
+// }
 
 func NewOrder(order *models.Order, user *models.User) error {
-    if order == nil || len(order.Number) == 0 {
+    if order == nil {
         return ErrOrderNothingToCreate
     }
 
@@ -54,7 +53,7 @@ func NewOrder(order *models.Order, user *models.User) error {
     queries := models.New(dbObj)
     _, err := queries.CreateOrder(context.Background(), models.CreateOrderParams{
         Number: order.Number,
-        UserID: pgtype.Int8{Int64: user.ID, Valid: true},
+        UserID: user.ID,
     })
 
     if err != nil {
@@ -62,11 +61,10 @@ func NewOrder(order *models.Order, user *models.User) error {
         return err
     }
 
-    // log.Printf("[model.Order/NewOrder]: Create new order#%q, for user(%d)\n", order.Number, user.ID)
     return nil
 }
 
-func OrdersRelated(user *models.User) ([]models.Order, error) {
+func OrdersRelated(user *models.User) ([]*models.Order, error) {
     if user == nil {
         return nil, errors.New("user is nil, can't get orders related to nothing")
     }
@@ -78,7 +76,7 @@ func OrdersRelated(user *models.User) ([]models.Order, error) {
     }
 
     queries := models.New(dbObj)
-    orders, err := queries.UserOrders(context.Background(), pgtype.Int8{Int64: user.ID, Valid: true})
+    orders, err := queries.UserOrders(context.Background(), user.ID)
 
     if err != nil {
         log.Printf("[model.Order/OrdersRelated]: Error on find related: %q\n", err)
