@@ -36,7 +36,7 @@ func JWTAuthenticate(c *gin.Context) {
     tok, err := verifyJWT(authToken)
 
     if err != nil {
-        log.Printf("[jwtAuthMDLWR]: failed token verification\n")
+        log.Printf("[jwtAuthMDLWR]: failed token verification: %q\n", err)
         c.AbortWithStatus(http.StatusUnauthorized)
         return
     }
@@ -68,6 +68,8 @@ func JWTAuthenticate(c *gin.Context) {
     c.Next()
 }
 
+// verifyJWT - Parse a jwt token string for verification.
+// Returns a token type
 func verifyJWT(tokStr string) (*jwt.Token, error) {
     token, err := jwt.Parse(tokStr, func(t *jwt.Token) (interface{}, error) {
         return jwtSecretKey, nil
