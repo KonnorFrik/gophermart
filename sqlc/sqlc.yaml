@@ -1,20 +1,8 @@
 version: "2"
 sql:
-  # - name: "common"
-  #   engine: "postgresql"
-  #   # queries: "query.sql"
-  #   # schema: "../migrations/20250522155824_create_user_table.up.sql"
-  #   schema: "../migrations/"
-  #   gen:
-  #     go: &go_default
-  #       package: "common"
-  #       out: "user_service/model/common"
-  #       sql_package: "pgx/v5"
-
   - name: "all"
     engine: "postgresql"
     schema: "../migrations/"
-    # queries: "user_queries.sql"
     queries: 
       - "user_queries.sql"
       - "order_queries.sql"
@@ -23,13 +11,5 @@ sql:
         package: "models"
         out: "../user_service/model/models"
         sql_package: "pgx/v5"
-
-  # - name: "orders"
-  #   engine: "postgresql"
-  #   schema: "../migrations/"
-  #   queries: "order_queries.sql"
-  #   gen:
-  #     go:
-  #       package: "orders"
-  #       out: "../user_service/model/orders"
-  #       sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_result_struct_pointers: true
