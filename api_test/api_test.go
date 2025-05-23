@@ -29,8 +29,8 @@ var (
 // full-consumers : only accept args (token cookies)
 type chainFunc func(*testing.T, string, []*http.Cookie) (string, []*http.Cookie)
 
-// Run testUserRegister for get token
-// pass token to all given funcs and overwrite it with return value (may be same)
+// Run testUserRegister for get token and cookies
+// pass token to all given chain funcs and overwrite 
 // at end call testUserDelete
 func runChain(t *testing.T, chain ...chainFunc) {
     token, cookies := testUserRegister(t)
