@@ -34,7 +34,7 @@ func UserRegister(c *gin.Context) {
     user, ok := postAuthCredentials(c)
 
     if !ok || user.Login == "" || user.Password == "" {
-        log.Printf("[/register]: Error on get user credentials\n")
+        log.Printf("[POST /register]: Error on get user credentials\n")
         c.Status(http.StatusBadRequest)
         return
     }
@@ -42,27 +42,32 @@ func UserRegister(c *gin.Context) {
     var err error
     userDB, err := model.NewUser(user.Login, user.Password)
 
-    if errors.Is(err, model.ErrUserAlreadyExist) {
-        log.Printf("[/register]: already exist %q\n", userDB.Login)
-        c.Status(http.StatusConflict)
-        return
-    }
-
-    if err != nil {
-        log.Printf("[/register]: Unknown error: %q\n", err)
+    // if errors.Is(err, model.ErrUserAlreadyExist) {
+    //     log.Printf("[/register]: already exist %q\n", userDB.Login)
+    //     c.Status(http.StatusConflict)
+    //     return
+    // }
+    if errors.Is(err, model.ErrDataBaseNotConnected) {
+        log.Printf("[POST /register]: db not connected\n")
         c.Status(http.StatusInternalServerError)
         return
     }
 
-    strToken, err := createToken(userDB)
-
     if err != nil {
-        log.Printf("[/register]: Error on create token: %q\n", err)
+        log.Printf("[POST /register]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
     }
 
-    uid := strconv.FormatUint(uint64(userDB.ID), 10)
+    strToken, err := createToken(userDB.ID)
+
+    if err != nil {
+        log.Printf("[POST /register]: Error on create token: %q\n", err)
+        c.Status(http.StatusInternalServerError)
+        return
+    }
+
+    uid := strconv.FormatInt(userDB.ID, 10)
     c.SetCookie("uid", uid, 3600, "/", "", false, true)
     c.JSON(http.StatusOK, gin.H{
         "token": strToken,
@@ -84,15 +89,15 @@ func UserLogin(c *gin.Context) {
         return
     }
 
-    strToken, err := createToken(userDB)
+    strToken, err := createToken(userDB.ID)
 
     if err != nil {
-        log.Printf("[/login]: Error on token creation: %q\n", err)
+        log.Printf("[POST /login]: Error on token creation: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
     }
 
-    uid := strconv.FormatUint(uint64(userDB.ID), 10)
+    uid := strconv.FormatInt(userDB.ID, 10)
     c.SetCookie("uid", uid, 3600, "/", "", false, true)
     c.JSON(http.StatusOK, gin.H{
         "token": strToken,
@@ -104,11 +109,11 @@ func UserDelete(c *gin.Context) {
 
     if err != nil {
         log.Printf("[DELETE /user]: missed cookie\n")
-        c.Status(http.StatusUnauthorized)
+        c.Status(http.StatusBadRequest)
         return
     }
 
-    userID, err := Int64(cookieUID)
+    userID, err := ToInt64(cookieUID)
 
     if err != nil {
         log.Printf("[DELETE /user]: invalid uid from cookie: %q\n", err)
@@ -128,21 +133,21 @@ func UserDelete(c *gin.Context) {
     userDB, ok := userDBbyCreadentials(user.Login, user.Password)
 
     if !ok {
-        log.Printf("[DELETE /user]: Not found in DB\n")
-        c.Status(http.StatusBadRequest)
+        log.Printf("[DELETE /user]: Not found in DB: %q\n", user.Login)
+        c.Status(http.StatusUnauthorized)
         return
     }
 
     if userDB.ID != userID {
         log.Printf("[DELETE /user]: Conflict: different id: DB(%d) != cookie(%d)\n", userDB.ID, userID)
-        c.Status(http.StatusConflict)
+        c.Status(http.StatusBadRequest)
         return
     }
 
     err = model.DeleteUser(userID)
 
     if err != nil {
-        log.Printf("[DELETE /user]: error from model: %q\n", err)
+        log.Printf("[DELETE /user]: error from model.DeleteUser: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
     }
@@ -161,7 +166,7 @@ func NewOrder(c *gin.Context) {
         return
     }
 
-    userID, err := Int64(cookieUID)
+    userID, err := ToInt64(cookieUID)
 
     if err != nil {
         log.Printf("[POST /orders]: invalid uid from cookie: %q\n", err)
@@ -194,7 +199,7 @@ func NewOrder(c *gin.Context) {
     }
     
     if !validByLUHN(orderString) {
-        log.Printf("[POST /orders]: Invalid input by LUHN\n")
+        log.Printf("[POST /orders]: Invalid by LUHN input\n")
         c.Status(http.StatusUnprocessableEntity)
         return
     }
@@ -203,15 +208,26 @@ func NewOrder(c *gin.Context) {
         Number: orderString,
     }
     err = model.NewOrder(&order, &models.User{ID: userID})
+    /*
+    TODO:
+    error can be like: duplicate - violates contraint
+    need to catch this and return code 200
+    */
 
-    if err != nil {
+    switch {
+    case errors.Is(err, model.ErrDataBaseNotConnected):
+        c.Status(http.StatusInternalServerError)
+    case errors.Is(err, model.ErrOrderNothingToCreate):
+        c.Status(http.StatusInternalServerError)
+    case err != nil:
         log.Printf("[POST /orders]: Got err: %q\n", err)
         c.Status(http.StatusInternalServerError)
-        return
+
+    default:
+        c.Status(http.StatusAccepted)
     }
 
-    // log.Printf("[POST /orders]: #%q - accepted\n", orderString)
-    c.Status(http.StatusAccepted)
+    // c.Status(http.StatusAccepted)
 }
 
 func AllOrders(c *gin.Context) {
@@ -223,7 +239,7 @@ func AllOrders(c *gin.Context) {
         return
     }
 
-    userID, err := Int64(cookieUID)
+    userID, err := ToInt64(cookieUID)
 
     if err != nil {
         log.Printf("[GET /orders]: invalid uid from cookie: %q\n", err)
