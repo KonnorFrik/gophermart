@@ -3,9 +3,10 @@ package model
 import (
 	"context"
 	"errors"
-	"gophermart/model/models"
+	"gophermart/internal/generated/models"
 	"log"
 	"sort"
+	"time"
 )
 
 
@@ -14,46 +15,28 @@ var (
     ErrOrderNothingToCreate = errors.New("nothing to create")
 )
 
-// const (
-// 	statusNew Status = iota
-// 	statusProcessing
-// 	statusInvalid
-// 	statusProcessed
-// )
 
-// type Status int
-//
-// func (s Status) String() string {
-//     switch s {
-//     case statusNew:
-//         return "NEW"
-//     case statusProcessing:
-//         return "PROCESSING"
-//     case statusInvalid:
-//         return "INVALID"
-//     case statusProcessed:
-//         return "PROCESSED"
-//
-//     default:
-//         return ""
-//     }
-// }
+type Order struct {
+    ID         int64 `json:"-"`
+    Accrual    int64 `json:"accrual"`
+	Number     string `json:"number"`
+	Status     string `json:"status"`
+    UploadedAt string `json:"uploaded_at"`
+	UserID     int64 `json:"-"`
+}
 
-func NewOrder(order *models.Order, user *models.User) error {
-    if order == nil {
-        return ErrOrderNothingToCreate
-    }
-
+func NewOrder(number string, userID int64) error {
     if dbObj == nil {
         log.Printf("[model.Order/NewOrder]: Lost connection to DB\n")
         connectToPostgres()
         return ErrDataBaseNotConnected
     }
 
-    queries := models.New(dbObj)
+    queries := getQueries()
+    defer putQueries(queries)
     _, err := queries.CreateOrder(context.Background(), models.CreateOrderParams{
-        Number: order.Number,
-        UserID: user.ID,
+        Number: number,
+        UserID: userID,
     })
 
     if err != nil {
@@ -64,19 +47,16 @@ func NewOrder(order *models.Order, user *models.User) error {
     return nil
 }
 
-func OrdersRelated(user *models.User) ([]*models.Order, error) {
-    if user == nil {
-        return nil, errors.New("user is nil, can't get orders related to nothing")
-    }
-
+func OrdersRelated(userID int64) ([]*Order, error) {
     if dbObj == nil {
         log.Printf("[model.Order/OrdersRelated]: Lost connection to DB\n")
         connectToPostgres()
         return nil, ErrDataBaseNotConnected
     }
 
-    queries := models.New(dbObj)
-    orders, err := queries.UserOrders(context.Background(), user.ID)
+    queries := getQueries()
+    defer putQueries(queries)
+    orders, err := queries.UserOrders(context.Background(), userID)
 
     if err != nil {
         log.Printf("[model.Order/OrdersRelated]: Error on find related: %q\n", err)
@@ -87,7 +67,20 @@ func OrdersRelated(user *models.User) ([]*models.Order, error) {
         return orders[j].UploadedAt.Time.Before(orders[i].UploadedAt.Time)
     })
 
-    return orders, nil
+    ordersRet := make([]*Order, len(orders))
+
+    for i, v := range orders {
+        ordersRet[i] = &Order{
+            ID: v.ID,
+            Accrual: v.Accrual,
+            Number: v.Number,
+            Status: string(v.Status),
+            UploadedAt: v.UploadedAt.Time.Format(time.RFC3339),
+            UserID: v.UserID,
+        }
+    }
+
+    return ordersRet, nil
 }
 
 // TODO: delete order by it id/number 
