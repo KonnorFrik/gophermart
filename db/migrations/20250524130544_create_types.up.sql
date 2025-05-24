@@ -1,0 +1,1 @@
+CREATE TYPE order_status as ENUM('NEW', 'PROCESSING', 'INVALID', 'PROCESSED');

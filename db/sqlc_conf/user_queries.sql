@@ -1,8 +1,8 @@
 -- name: CreateUser :one
 INSERT INTO users (
-    login, password
+    email, login, password
 ) VALUES (
-    $1, $2
+    $1, $2, $3
 )
 RETURNING *;
 

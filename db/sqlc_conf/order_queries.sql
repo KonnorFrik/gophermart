@@ -1,7 +1,7 @@
 -- name: CreateOrder :one
 INSERT INTO orders (
     accrual, number, status, uploaded_at, user_id 
-) VALUES ( 0, $1, 0, NOW(), $2 )
+) VALUES ( 0, $1, 'NEW', NOW(), $2 )
 RETURNING *;
 
 -- name: UserOrders :many
