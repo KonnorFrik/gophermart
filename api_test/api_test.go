@@ -16,6 +16,7 @@ const (
 
     userLogin = "user"
     userPassw = "user"
+    userEmail = "email@user.domain"
 )
 
 var (
@@ -54,6 +55,7 @@ func testUserRegister(t *testing.T) (string, []*http.Cookie) {
     req.SetBody(map[string]string{
         "login": userLogin,
         "password": userPassw,
+        "email": userEmail,
     })
     response, err := req.Post(address + "/api/user/register")
 
@@ -94,6 +96,7 @@ func testUserLogin(t *testing.T) (string, []*http.Cookie) {
         map[string]string{
             "login": userLogin,
             "password": userPassw,
+            "email": userEmail,
         },
     )
 
@@ -136,6 +139,7 @@ func testUserDelete(t *testing.T, token string, cookies []*http.Cookie) {
         map[string]string{
             "login": userLogin,
             "password": userPassw,
+            "email": userEmail,
         },
     ).SetHeader("Authorization", token).SetCookies(cookies)
 
