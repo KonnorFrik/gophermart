@@ -10,7 +10,6 @@ import (
 	"unicode"
 
 	"gophermart/model"
-	"gophermart/model/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,29 +30,28 @@ func init() {
 
 // Register - create a new user and token
 func UserRegister(c *gin.Context) {
-    user, ok := postAuthCredentials(c)
+    var user model.User
+    var err error
+    err = c.ShouldBindBodyWithJSON(&user)
 
-    if !ok || user.Login == "" || user.Password == "" {
-        log.Printf("[POST /register]: Error on get user credentials\n")
-        c.Status(http.StatusBadRequest)
-        return
+    if err != nil {
+        log.Printf("[/login]: Error on binding: %v\n", err)
     }
 
-    var err error
-    userDB, err := model.NewUser(user.Login, user.Password)
+    userDB, err := model.NewUser(user)
 
-    // if errors.Is(err, model.ErrUserAlreadyExist) {
-    //     log.Printf("[/register]: already exist %q\n", userDB.Login)
-    //     c.Status(http.StatusConflict)
-    //     return
-    // }
-    if errors.Is(err, model.ErrDataBaseNotConnected) {
+    switch {
+    case errors.Is(err, model.ErrDataBaseNotConnected):
         log.Printf("[POST /register]: db not connected\n")
         c.Status(http.StatusInternalServerError)
         return
-    }
 
-    if err != nil {
+    case errors.Is(err, model.ErrUserInvalidData):
+        log.Printf("[POST /register]: invalid input data: %+v\n", user)
+        c.Status(http.StatusBadRequest)
+        return
+
+    case err != nil:
         log.Printf("[POST /register]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
@@ -75,17 +73,31 @@ func UserRegister(c *gin.Context) {
 }
 
 func UserLogin(c *gin.Context) {
-    user, ok := postAuthCredentials(c)
+    var user model.User
+    err := c.ShouldBindBodyWithJSON(&user)
 
-    if !ok {
-        c.Status(http.StatusUnauthorized)
+    if err != nil {
+        log.Printf("[/login]: Error on binding: %v\n", err)
+        c.Status(http.StatusBadRequest)
         return
     }
 
-    userDB, ok := userDBbyCreadentials(user.Login, user.Password)
+    userDB, err := model.UserByCredentials(user)
 
-    if !ok {
-        c.Status(http.StatusUnauthorized)
+    switch {
+    case errors.Is(err, model.ErrDataBaseNotConnected):
+        log.Printf("[POST /register]: db not connected\n")
+        c.Status(http.StatusInternalServerError)
+        return
+
+    case errors.Is(err, model.ErrUserInvalidData):
+        log.Printf("[POST /register]: invalid input data: %+v\n", user)
+        c.Status(http.StatusBadRequest)
+        return
+
+    case err != nil:
+        log.Printf("[POST /register]: Unknown error: %q\n", err)
+        c.Status(http.StatusInternalServerError)
         return
     }
 
@@ -121,20 +133,32 @@ func UserDelete(c *gin.Context) {
         return
     }
 
-    user, ok := postAuthCredentials(c)
+    var user model.User
+    err = c.ShouldBindBodyWithJSON(&user)
 
-    if !ok {
-        log.Printf("[DELETE /user]: no credentials\n")
+    if err != nil {
+        log.Printf("[/login]: Error on binding: %v\n", err)
         c.Status(http.StatusBadRequest)
         return
     }
 
     // validate creadentials
-    userDB, ok := userDBbyCreadentials(user.Login, user.Password)
+    userDB, err := model.UserByCredentials(user)
 
-    if !ok {
-        log.Printf("[DELETE /user]: Not found in DB: %q\n", user.Login)
-        c.Status(http.StatusUnauthorized)
+    switch {
+    case errors.Is(err, model.ErrDataBaseNotConnected):
+        log.Printf("[POST /register]: db not connected\n")
+        c.Status(http.StatusInternalServerError)
+        return
+
+    case errors.Is(err, model.ErrUserInvalidData):
+        log.Printf("[POST /register]: invalid input data: %+v\n", user)
+        c.Status(http.StatusBadRequest)
+        return
+
+    case err != nil:
+        log.Printf("[POST /register]: Unknown error: %q\n", err)
+        c.Status(http.StatusInternalServerError)
         return
     }
 
@@ -144,7 +168,7 @@ func UserDelete(c *gin.Context) {
         return
     }
 
-    err = model.DeleteUser(userID)
+    err = model.DeleteUserById(userID)
 
     if err != nil {
         log.Printf("[DELETE /user]: error from model.DeleteUser: %q\n", err)
@@ -152,6 +176,7 @@ func UserDelete(c *gin.Context) {
         return
     }
 
+    c.SetCookie("uid", cookieUID, -1, "/", "", false, true)
     c.Status(http.StatusOK)
 }
 
@@ -204,10 +229,7 @@ func NewOrder(c *gin.Context) {
         return
     }
 
-    order := models.Order{
-        Number: orderString,
-    }
-    err = model.NewOrder(&order, &models.User{ID: userID})
+    err = model.NewOrder(orderString, userID)
     /*
     TODO:
     error can be like: duplicate - violates contraint
@@ -247,7 +269,7 @@ func AllOrders(c *gin.Context) {
         return
     }
 
-    orders, err := model.OrdersRelated(&models.User{ID: userID})
+    orders, err := model.OrdersRelated(userID)
 
     if err != nil {
         log.Printf("[GET /orders]: Error on fetch data: %q\n", err)
