@@ -56,11 +56,6 @@ func UserRegister(c *gin.Context) {
         log.Printf("[POST /register]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
-
-    // case err != nil:
-    //     log.Printf("[POST /register]: Error: %q\n", err)
-    //     c.Status(http.StatusInternalServerError)
-    //     return
     }
 
     strToken, err := createToken(userDB.ID)
@@ -103,11 +98,6 @@ func UserLogin(c *gin.Context) {
         log.Printf("[POST /register]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
-
-    // case err != nil:
-    //     log.Printf("[POST /register]: Error: %q\n", err)
-    //     c.Status(http.StatusInternalServerError)
-    //     return
     }
 
     strToken, err := createToken(userDB.ID)
@@ -166,11 +156,6 @@ func UserDelete(c *gin.Context) {
         log.Printf("[POST /register]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
-
-    // case err != nil:
-    //     log.Printf("[POST /register]: Error: %q\n", err)
-    //     c.Status(http.StatusInternalServerError)
-    //     return
     }
 
     if userDB.ID != userID {
@@ -266,9 +251,6 @@ func AllOrders(c *gin.Context) {
     case errors.Is(err, model.ErrUnknown):
         log.Printf("[POST /orders]: Unknown err: %q\n", err)
         c.Status(http.StatusInternalServerError)
-
-    default:
-        c.Status(http.StatusAccepted)
     }
 
     c.JSON(http.StatusOK, orders)
