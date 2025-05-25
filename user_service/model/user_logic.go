@@ -17,13 +17,11 @@ var (
 // Accept raw data from request body.
 func NewUser(user User) (*User, error) {
 	if dbObj == nil {
-		// log.Printf("[model.User/NewUser]: Lost connection to DB\n")
 		connectToPostgres()
 		return nil, ErrDataBaseNotConnected
 	}
 
     if !user.ValidCredentials() {
-		// log.Printf("[model.User/NewUser]: Error on validate\n")
         return nil, ErrUserInvalidData
     }
     
@@ -61,13 +59,11 @@ func NewUser(user User) (*User, error) {
 // UserByCredentials - Returns a user data stored in DB
 func UserByCredentials(user User) (*User, error) {
 	if dbObj == nil {
-		// log.Printf("[model.User/UserByLogin]: Lost connection to DB\n")
 		connectToPostgres()
 		return nil, ErrDataBaseNotConnected
 	}
 
     if !user.ValidCredentials() {
-		// log.Printf("[model.User/NewUser]: Error on validate\n")
         return nil, ErrUserInvalidData
     }
 
@@ -100,7 +96,6 @@ func UserByCredentials(user User) (*User, error) {
 // DeleteUserById - Delete user from DB
 func DeleteUserById(id int64) error {
 	if dbObj == nil {
-		// log.Printf("[model.User/DeleteUser]: Lost connection to DB\n")
 		connectToPostgres()
 		return ErrDataBaseNotConnected
 	}
