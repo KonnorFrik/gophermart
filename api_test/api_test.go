@@ -31,7 +31,7 @@ var (
 type chainFunc func(*testing.T, string, []*http.Cookie) (string, []*http.Cookie)
 
 // Run testUserRegister for get token and cookies
-// pass token to all given chain funcs and overwrite 
+// pass token to all given chain funcs and overwrite data (token and cookie)
 // at end call testUserDelete
 func runChain(t *testing.T, chain ...chainFunc) {
     token, cookies := testUserRegister(t)
