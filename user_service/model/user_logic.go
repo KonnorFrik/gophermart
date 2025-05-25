@@ -17,13 +17,13 @@ var (
 // Accept raw data from request body.
 func NewUser(user User) (*User, error) {
 	if dbObj == nil {
-		log.Printf("[model.User/NewUser]: Lost connection to DB\n")
+		// log.Printf("[model.User/NewUser]: Lost connection to DB\n")
 		connectToPostgres()
 		return nil, ErrDataBaseNotConnected
 	}
 
     if !user.ValidCredentials() {
-		log.Printf("[model.User/NewUser]: Error on validate\n")
+		// log.Printf("[model.User/NewUser]: Error on validate\n")
         return nil, ErrUserInvalidData
     }
     
@@ -34,10 +34,16 @@ func NewUser(user User) (*User, error) {
     var err error
 
     userDB, err := queries.CreateUser(context.Background(), models.CreateUserParams{
-        Email: user.Email,
         Login: user.Login,
         Password: user.Password,
     })
+    err = WrapError(err)
+
+    switch {
+    case errors.Is(err, ErrDataBaseNotConnected):
+        connectToPostgres()
+        return nil, err
+    }
 
 	if err != nil {
 		log.Printf("[model.User/NewUser]: Error on Create: %q\n", err)
@@ -46,7 +52,6 @@ func NewUser(user User) (*User, error) {
 
     toRet := &User{
         ID: userDB.ID,
-        Email: userDB.Email,
         Login: userDB.Login,
         Password: userDB.Password,
     }
@@ -56,19 +61,26 @@ func NewUser(user User) (*User, error) {
 // UserByCredentials - Returns a user data stored in DB
 func UserByCredentials(user User) (*User, error) {
 	if dbObj == nil {
-		log.Printf("[model.User/UserByLogin]: Lost connection to DB\n")
+		// log.Printf("[model.User/UserByLogin]: Lost connection to DB\n")
 		connectToPostgres()
 		return nil, ErrDataBaseNotConnected
 	}
 
     if !user.ValidCredentials() {
-		log.Printf("[model.User/NewUser]: Error on validate\n")
+		// log.Printf("[model.User/NewUser]: Error on validate\n")
         return nil, ErrUserInvalidData
     }
 
     queries := getQueries()
     defer putQueries(queries)
     userDB, err := queries.UserByLogin(context.Background(), user.Login)
+    err = WrapError(err)
+
+    switch {
+    case errors.Is(err, ErrDataBaseNotConnected):
+        connectToPostgres()
+        return nil, err
+    }
 
 	if err != nil {
 		log.Printf("[model.User/UserByLogin]: Error: %q\n", err)
@@ -79,7 +91,6 @@ func UserByCredentials(user User) (*User, error) {
 
     toRet := &User{
         ID: userDB.ID,
-        Email: userDB.Email,
         Login: userDB.Login,
         Password: userDB.Password,
     }
@@ -89,7 +100,7 @@ func UserByCredentials(user User) (*User, error) {
 // DeleteUserById - Delete user from DB
 func DeleteUserById(id int64) error {
 	if dbObj == nil {
-		log.Printf("[model.User/DeleteUser]: Lost connection to DB\n")
+		// log.Printf("[model.User/DeleteUser]: Lost connection to DB\n")
 		connectToPostgres()
 		return ErrDataBaseNotConnected
 	}
@@ -97,6 +108,13 @@ func DeleteUserById(id int64) error {
     queries := getQueries()
     defer putQueries(queries)
     err := queries.DeleteUser(context.Background(), id)
+    err = WrapError(err)
+
+    switch {
+    case errors.Is(err, ErrDataBaseNotConnected):
+        connectToPostgres()
+        return err
+    }
 
 	if err != nil {
 		log.Printf("[model.User/DeleteUser]: Error on delete %q\n", err)

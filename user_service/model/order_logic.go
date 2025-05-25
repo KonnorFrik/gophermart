@@ -4,32 +4,38 @@ import (
 	"context"
 	"errors"
 	"gophermart/internal/generated/models"
-	"log"
 	"sort"
 	"time"
+	"unicode"
 )
-
 
 var (
-    ErrOrderAlreadyExist = errors.New("order already exist")
-    ErrOrderNothingToCreate = errors.New("nothing to create")
+    // ErrOrderAlreadyExist = errors.New("order already exist")
+    ErrOrderInvalidInput = errors.New("invalid order number")
 )
-
-
-type Order struct {
-    ID         int64 `json:"-"`
-    Accrual    int64 `json:"accrual"`
-	Number     string `json:"number"`
-	Status     string `json:"status"`
-    UploadedAt string `json:"uploaded_at"`
-	UserID     int64 `json:"-"`
-}
 
 func NewOrder(number string, userID int64) error {
     if dbObj == nil {
-        log.Printf("[model.Order/NewOrder]: Lost connection to DB\n")
+        // log.Printf("[model.Order/NewOrder]: Lost connection to DB\n")
         connectToPostgres()
         return ErrDataBaseNotConnected
+    }
+
+    if len(number) == 0 {
+        // log.Printf("[modes.Order/NewOrder]: Zero data length\n")
+        return ErrOrderInvalidInput
+    }
+
+    for _, r := range number {
+        if !unicode.IsDigit(r) {
+            // log.Printf("[modes.Order/NewOrder]: Invalid input data: %q\n", number)
+            return ErrOrderInvalidInput
+        }
+    }
+    
+    if !validByLUHN(number) {
+        // log.Printf("[modes.Order/NewOrder]: Invalid by LUHN input: %q\n", number)
+        return ErrOrderInvalidInput
     }
 
     queries := getQueries()
@@ -38,18 +44,20 @@ func NewOrder(number string, userID int64) error {
         Number: number,
         UserID: userID,
     })
+    err = WrapError(err)
 
-    if err != nil {
-        log.Printf("[model.Order/NewOrder]: Error on Create: %q\n", err)
+    switch {
+    case errors.Is(err, ErrDataBaseNotConnected):
+        connectToPostgres()
         return err
     }
 
-    return nil
+    return err
 }
 
 func OrdersRelated(userID int64) ([]*Order, error) {
     if dbObj == nil {
-        log.Printf("[model.Order/OrdersRelated]: Lost connection to DB\n")
+        // log.Printf("[model.Order/OrdersRelated]: Lost connection to DB\n")
         connectToPostgres()
         return nil, ErrDataBaseNotConnected
     }
@@ -57,9 +65,16 @@ func OrdersRelated(userID int64) ([]*Order, error) {
     queries := getQueries()
     defer putQueries(queries)
     orders, err := queries.UserOrders(context.Background(), userID)
+    err = WrapError(err)
+
+    switch {
+    case errors.Is(err, ErrDataBaseNotConnected):
+        connectToPostgres()
+        return nil, err
+    }
 
     if err != nil {
-        log.Printf("[model.Order/OrdersRelated]: Error on find related: %q\n", err)
+        // log.Printf("[model.Order/OrdersRelated]: Error on find: %q\n", err)
         return nil, err
     }
 
@@ -82,6 +97,3 @@ func OrdersRelated(userID int64) ([]*Order, error) {
 
     return ordersRet, nil
 }
-
-// TODO: delete order by it id/number 
-// TODO: delete all orders belongs to specific user

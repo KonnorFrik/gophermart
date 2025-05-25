@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"unicode"
 
 	"gophermart/model"
 
@@ -45,16 +44,23 @@ func UserRegister(c *gin.Context) {
         log.Printf("[POST /register]: db not connected\n")
         c.Status(http.StatusInternalServerError)
         return
-
     case errors.Is(err, model.ErrUserInvalidData):
         log.Printf("[POST /register]: invalid input data: %+v\n", user)
         c.Status(http.StatusBadRequest)
         return
-
-    case err != nil:
+    case errors.Is(err, model.ErrConstraintUniqueViolation):
+        log.Printf("[POST /register]: user already exist\n")
+        c.Status(http.StatusConflict)
+        return
+    case errors.Is(err, model.ErrUnknown):
         log.Printf("[POST /register]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
+
+    // case err != nil:
+    //     log.Printf("[POST /register]: Error: %q\n", err)
+    //     c.Status(http.StatusInternalServerError)
+    //     return
     }
 
     strToken, err := createToken(userDB.ID)
@@ -89,16 +95,19 @@ func UserLogin(c *gin.Context) {
         log.Printf("[POST /register]: db not connected\n")
         c.Status(http.StatusInternalServerError)
         return
-
     case errors.Is(err, model.ErrUserInvalidData):
         log.Printf("[POST /register]: invalid input data: %+v\n", user)
         c.Status(http.StatusBadRequest)
         return
-
-    case err != nil:
+    case errors.Is(err, model.ErrUnknown):
         log.Printf("[POST /register]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
+
+    // case err != nil:
+    //     log.Printf("[POST /register]: Error: %q\n", err)
+    //     c.Status(http.StatusInternalServerError)
+    //     return
     }
 
     strToken, err := createToken(userDB.ID)
@@ -142,7 +151,6 @@ func UserDelete(c *gin.Context) {
         return
     }
 
-    // validate creadentials
     userDB, err := model.UserByCredentials(user)
 
     switch {
@@ -150,16 +158,19 @@ func UserDelete(c *gin.Context) {
         log.Printf("[POST /register]: db not connected\n")
         c.Status(http.StatusInternalServerError)
         return
-
     case errors.Is(err, model.ErrUserInvalidData):
         log.Printf("[POST /register]: invalid input data: %+v\n", user)
         c.Status(http.StatusBadRequest)
         return
-
-    case err != nil:
+    case errors.Is(err, model.ErrUnknown):
         log.Printf("[POST /register]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
+
+    // case err != nil:
+    //     log.Printf("[POST /register]: Error: %q\n", err)
+    //     c.Status(http.StatusInternalServerError)
+    //     return
     }
 
     if userDB.ID != userID {
@@ -207,49 +218,26 @@ func NewOrder(c *gin.Context) {
         return
     }
 
-    if len(bodyBytes) == 0 {
-        log.Printf("[POST /orders]: Empty Body\n")
-        c.Status(http.StatusBadRequest)
-        return
-    }
-
     orderString := string(bodyBytes)
-
-    for _, r := range orderString {
-        if !unicode.IsDigit(r) {
-            log.Printf("[POST /orders]: Invalid input data: %q\n", orderString)
-            c.Status(http.StatusBadRequest)
-            return
-        }
-    }
-    
-    if !validByLUHN(orderString) {
-        log.Printf("[POST /orders]: Invalid by LUHN input\n")
-        c.Status(http.StatusUnprocessableEntity)
-        return
-    }
-
     err = model.NewOrder(orderString, userID)
-    /*
-    TODO:
-    error can be like: duplicate - violates contraint
-    need to catch this and return code 200
-    */
 
     switch {
     case errors.Is(err, model.ErrDataBaseNotConnected):
+        log.Printf("[POST /orders]: db not connected\n")
         c.Status(http.StatusInternalServerError)
-    case errors.Is(err, model.ErrOrderNothingToCreate):
-        c.Status(http.StatusInternalServerError)
-    case err != nil:
-        log.Printf("[POST /orders]: Got err: %q\n", err)
+    case errors.Is(err, model.ErrOrderInvalidInput):
+        log.Printf("[POST /orders]: invalid input: %q\n", orderString)
+        c.Status(http.StatusBadRequest)
+    case errors.Is(err, model.ErrConstraintUniqueViolation):
+        log.Printf("[POST /orders]: already exist\n")
+        c.Status(http.StatusOK)
+    case errors.Is(err, model.ErrUnknown):
+        log.Printf("[POST /orders]: Unknown err: %q\n", err)
         c.Status(http.StatusInternalServerError)
 
     default:
         c.Status(http.StatusAccepted)
     }
-
-    // c.Status(http.StatusAccepted)
 }
 
 func AllOrders(c *gin.Context) {
@@ -271,10 +259,16 @@ func AllOrders(c *gin.Context) {
 
     orders, err := model.OrdersRelated(userID)
 
-    if err != nil {
-        log.Printf("[GET /orders]: Error on fetch data: %q\n", err)
+    switch {
+    case errors.Is(err, model.ErrDataBaseNotConnected):
+        log.Printf("[POST /orders]: db not connected\n")
         c.Status(http.StatusInternalServerError)
-        return
+    case errors.Is(err, model.ErrUnknown):
+        log.Printf("[POST /orders]: Unknown err: %q\n", err)
+        c.Status(http.StatusInternalServerError)
+
+    default:
+        c.Status(http.StatusAccepted)
     }
 
     c.JSON(http.StatusOK, orders)

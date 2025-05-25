@@ -20,10 +20,6 @@ func createToken(userID int64) (string, error) {
     return str, err
 }
 
-func validByLUHN(numbers string) bool {
-    return len(numbers) > 0
-}
-
 func ToInt64(value string) (int64, error) {
     value64, err := strconv.ParseInt(value, 10, strconv.IntSize)
 
