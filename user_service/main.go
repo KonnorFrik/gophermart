@@ -6,7 +6,13 @@ import (
     "gophermart/middleware"
 
 	"github.com/gin-gonic/gin"
+    _ "gophermart/docs"
+    swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
+
+// @title gophermart
+// @version 0.1
 
 func main() {
     router := gin.Default()
@@ -24,5 +30,6 @@ func main() {
     UserAuthGroup.GET("/orders", api.AllOrders)
 
     log.Println("[SERVER]: listen at:", ":8080")
+    router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
     router.Run() 
 }

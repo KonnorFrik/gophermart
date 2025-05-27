@@ -27,7 +27,14 @@ func init() {
     }
 }
 
-// Register - create a new user and token
+// @summary Register a new user
+// @tags account
+// @accept json
+// @produce json 
+// @success 200
+// @failure 500
+// @param message body model.User true "Account Info"
+// @router /api/user/register [post]
 func UserRegister(c *gin.Context) {
     var user model.User
     var err error
