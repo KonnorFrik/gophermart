@@ -10,7 +10,7 @@ import (
 )
 
 var (
-    ErrOrderInvalidInput = errors.New("invalid order number")
+    ErrOrderInvalidNumber = errors.New("invalid order number")
 )
 
 func NewOrder(number string, userID int64) error {
@@ -20,22 +20,22 @@ func NewOrder(number string, userID int64) error {
     }
 
     if len(number) == 0 {
-        return ErrOrderInvalidInput
+        return ErrOrderInvalidNumber
     }
 
     for _, r := range number {
         if !unicode.IsDigit(r) {
-            return ErrOrderInvalidInput
+            return ErrOrderInvalidNumber
         }
     }
     
     if !validByLUHN(number) {
-        return ErrOrderInvalidInput
+        return ErrOrderInvalidNumber
     }
 
     queries := getQueries()
     defer putQueries(queries)
-    _, err := queries.CreateOrder(context.Background(), models.CreateOrderParams{
+    _, err := queries.CreateOrder(context.TODO(), models.CreateOrderParams{
         Number: number,
         UserID: userID,
     })
@@ -58,7 +58,7 @@ func OrdersRelated(userID int64) ([]*Order, error) {
 
     queries := getQueries()
     defer putQueries(queries)
-    orders, err := queries.UserOrders(context.Background(), userID)
+    orders, err := queries.UserOrders(context.TODO(), userID)
     err = WrapError(err)
 
     switch {
@@ -74,7 +74,6 @@ func OrdersRelated(userID int64) ([]*Order, error) {
     sort.SliceStable(orders, func(i, j int) bool {
         return orders[j].UploadedAt.Time.Before(orders[i].UploadedAt.Time)
     })
-
     ordersRet := make([]*Order, len(orders))
 
     for i, v := range orders {

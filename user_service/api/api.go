@@ -210,7 +210,7 @@ func NewOrder(c *gin.Context) {
     case errors.Is(err, model.ErrDataBaseNotConnected):
         log.Printf("[POST /orders]: db not connected\n")
         c.Status(http.StatusInternalServerError)
-    case errors.Is(err, model.ErrOrderInvalidInput):
+    case errors.Is(err, model.ErrOrderInvalidNumber):
         log.Printf("[POST /orders]: invalid input: %q\n", orderString)
         c.Status(http.StatusBadRequest)
     case errors.Is(err, model.ErrConstraintUniqueViolation):
