@@ -10,7 +10,7 @@ import (
 var (
 	ErrUserAlreadyExist = errors.New("user already exist")
 	ErrUserDoesNotExist = errors.New("user does not exist")
-    ErrUserInvalidData = errors.New("invalid data for create user")
+    ErrUserInvalidData = errors.New("invalid data")
 )
 
 // NewUser create a new user in DB.
@@ -25,13 +25,15 @@ func NewUser(user User) (*User, error) {
         return nil, ErrUserInvalidData
     }
     
-    // hash password here
+    if err := user.HashPassword(); err != nil {
+        return nil, ErrUserInvalidData
+    }
 
     queries := getQueries()
     defer putQueries(queries)
     var err error
 
-    userDB, err := queries.CreateUser(context.Background(), models.CreateUserParams{
+    userDB, err := queries.CreateUser(context.TODO(), models.CreateUserParams{
         Login: user.Login,
         Password: user.Password,
     })
@@ -51,7 +53,7 @@ func NewUser(user User) (*User, error) {
     toRet := &User{
         ID: userDB.ID,
         Login: userDB.Login,
-        Password: userDB.Password,
+        // Password: userDB.Password,
     }
 	return toRet, nil
 }
@@ -69,7 +71,7 @@ func UserByCredentials(user User) (*User, error) {
 
     queries := getQueries()
     defer putQueries(queries)
-    userDB, err := queries.UserByLogin(context.Background(), user.Login)
+    userDB, err := queries.UserByLogin(context.TODO(), user.Login)
     err = WrapError(err)
 
     switch {
@@ -79,16 +81,19 @@ func UserByCredentials(user User) (*User, error) {
     }
 
 	if err != nil {
-		log.Printf("[model.User/UserByLogin]: Error: %q\n", err)
+		log.Printf("[model.User/UserByCredentials]: Error: %q\n", err)
 		return nil, err
 	}
 
-    // check hashed password somewhere here
+    if err := user.ComparePassword(userDB.Password); err != nil {
+        log.Printf("[model.User/UserByCredentials]: Error on password compare: %q\n", err)
+        return nil, ErrUserInvalidData
+    }
 
     toRet := &User{
         ID: userDB.ID,
         Login: userDB.Login,
-        Password: userDB.Password,
+        // Password: userDB.Password,
     }
 	return toRet, nil
 }
@@ -102,7 +107,7 @@ func DeleteUserById(id int64) error {
 
     queries := getQueries()
     defer putQueries(queries)
-    err := queries.DeleteUser(context.Background(), id)
+    err := queries.DeleteUser(context.TODO(), id)
     err = WrapError(err)
 
     switch {
