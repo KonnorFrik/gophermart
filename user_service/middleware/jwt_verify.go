@@ -17,17 +17,17 @@ var (
     ErrInvalidToken = errors.New("invalid token")
 )
 
-func init() {
-    if len(jwtSecretKey) == 0 {
-        panic("jwt secret key is missing")
-    }
-}
-
 func JWTAuthenticate(c *gin.Context) {
+    if len(jwtSecretKey) == 0 {
+        log.Println("[MDWR/jwtAuth]: Token not loaded")
+        c.AbortWithStatus(http.StatusInternalServerError)
+        return
+    }
+
     authToken := c.GetHeader("Authorization")
 
     if authToken == "" {
-        log.Printf("[jwtAuthMDLWR]: token is missed\n")
+        log.Printf("[MDWR/jwtAuth]: token is missed\n")
         c.AbortWithStatus(http.StatusUnauthorized)
         return
     }
@@ -36,7 +36,7 @@ func JWTAuthenticate(c *gin.Context) {
     tok, err := verifyJWT(authToken)
 
     if err != nil {
-        log.Printf("[jwtAuthMDLWR]: failed token verification: %q\n", err)
+        log.Printf("[MDWR/jwtAuth]: failed token verification: %q\n", err)
         c.AbortWithStatus(http.StatusUnauthorized)
         return
     }
@@ -44,7 +44,7 @@ func JWTAuthenticate(c *gin.Context) {
     mapClaims, ok := tok.Claims.(jwt.MapClaims)
 
     if !ok {
-        log.Printf("[jwtAuthMDLWR]: Can't convert claims\n")
+        log.Printf("[MDWR/jwtAuth]: Can't convert claims\n")
         c.AbortWithStatus(http.StatusUnauthorized)
         return
     }
@@ -52,7 +52,7 @@ func JWTAuthenticate(c *gin.Context) {
     userIDstr, err := mapClaims.GetSubject()
 
     if err != nil {
-        log.Printf("[jwtAuthMDLWR]: Can't get subject claim: %q\n", err)
+        log.Printf("[MDWR/jwtAuth]: Can't get subject claim: %q\n", err)
         c.AbortWithStatus(http.StatusUnauthorized)
         return
     }
@@ -60,7 +60,7 @@ func JWTAuthenticate(c *gin.Context) {
     cookieUID, err := c.Cookie("uid")
 
     if cookieUID != userIDstr {
-        log.Printf("[jwtAuthMDLWR]: Cookie id does not math jwt id\n")
+        log.Printf("[MDWR/jwtAuth]: Cookie id does not math jwt id\n")
         c.AbortWithStatus(http.StatusUnauthorized)
         return
     }
