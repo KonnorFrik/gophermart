@@ -62,16 +62,16 @@ func testUserRegister(t *testing.T) (string, []*http.Cookie) {
     }
 
     var statusCode int = response.StatusCode()
-    var wantStatus int = 200
+    var wantStatus int = http.StatusOK
 
-    if statusCode != wantStatus && statusCode != 409 {
+    if statusCode != wantStatus && statusCode != http.StatusConflict {
         t.Errorf("Got = %d, Want = %d\n", statusCode, wantStatus)
     }
 
     body := response.Body()
 
     if len(body) == 0 {
-        t.Errorf("Got no body = len=%d\n", len(body))
+        t.Errorf("Got no body\n")
     }
 
     var result = map[string]string{}
@@ -104,7 +104,7 @@ func testUserLogin(t *testing.T) (string, []*http.Cookie) {
     }
 
     var statusCode int = response.StatusCode()
-    var wantStatus int = 200
+    var wantStatus int = http.StatusOK
 
     if statusCode != wantStatus {
         t.Errorf("Got = %d, Want = %d\n", statusCode, wantStatus)
@@ -113,7 +113,7 @@ func testUserLogin(t *testing.T) (string, []*http.Cookie) {
     body := response.Body()
 
     if len(body) == 0 {
-        t.Errorf("Got no body = len=%d\n", len(body))
+        t.Errorf("Got no body\n")
     }
 
     var result = map[string]string{}
@@ -146,7 +146,7 @@ func testUserDelete(t *testing.T, token string, cookies []*http.Cookie) {
     }
 
     var statusCode int = response.StatusCode()
-    var wantStatus int = 200
+    var wantStatus int = http.StatusOK
 
     if statusCode != wantStatus {
         t.Errorf("Got = %d, Want = %d\n", statusCode, wantStatus)
@@ -157,6 +157,8 @@ func TestOrderCRUD(t *testing.T) {
     runChain(
         t,
         testCreateOrder,
+        testCreateOrderAgain,
+        testGetOrders,
     )
 }
 
@@ -174,6 +176,86 @@ func testCreateOrder(t *testing.T, token string, cookies []*http.Cookie) (string
 
     if statusCode != wantStatus {
         t.Errorf("Got = %d, Want = %d\n", statusCode, wantStatus)
+    }
+
+    return token, response.Cookies()
+}
+
+func testCreateOrderAgain(t *testing.T, token string, cookies []*http.Cookie) (string, []*http.Cookie) {
+    req := client.R().SetHeader("Authorization", token).SetCookies(cookies)
+    req = req.SetBody("1234")
+    response, err := req.Post(address + "/api/user/orders")
+
+    if err != nil {
+        t.Errorf("Got = %v\n", err)
+    }
+
+    var statusCode int = response.StatusCode()
+    var wantStatus int = http.StatusOK
+
+    if statusCode != wantStatus {
+        t.Errorf("Got = %d, Want = %d\n", statusCode, wantStatus)
+    }
+
+    return token, response.Cookies()
+}
+
+func testGetOrders(t *testing.T, token string, cookies []*http.Cookie) (string, []*http.Cookie) {
+    req := client.R().SetHeader("Authorization", token).SetCookies(cookies)
+    response, err := req.Get(address + "/api/user/orders")
+
+    if err != nil {
+        t.Errorf("Got = %v\n", err)
+    }
+
+    var statusCode int = response.StatusCode()
+    var wantStatus int = http.StatusOK
+
+    if statusCode != wantStatus {
+        t.Errorf("Got = %d, Want = %d\n", statusCode, wantStatus)
+    }
+
+    bodyRaw := response.Body()
+
+    if len(bodyRaw) == 0 {
+        t.Errorf("Got no body\n")
+    }
+
+    var body []map[string]any
+    err = json.Unmarshal([]byte(bodyRaw), &body)
+
+    if err != nil {
+        t.Errorf("Unmarshal failed: %q\n", err)
+    }
+
+    var key = "number"
+    numberValue := body[0][key].(string)
+    var wantNumber = "1234"
+
+    if numberValue != wantNumber {
+        t.Errorf("Key[%s]: Got = %q, Want = %q\n", key, body[0][key], wantNumber)
+    }
+
+    key = "status"
+    statusValue := body[0][key].(string)
+    var wantBodyStatus = "NEW"
+
+    if statusValue != wantBodyStatus {
+        t.Errorf("Key[%s]: Got = %q, Want = %q\n", key, body[0][key], wantBodyStatus)
+    }
+
+    key = "accrual"
+    accrualValue := int(body[0][key].(float64))
+    var wantAccrual int = 0
+
+    if accrualValue != wantAccrual {
+        t.Errorf("Key[%s]: Got = %q, Want = %q\n", key, body[0][key], wantAccrual)
+    }
+
+    var uploaded_atValue = body[0]["uploaded_at"].(string)
+
+    if len(uploaded_atValue) == 0 {
+        t.Errorf("Got no uploaded time\n")
     }
 
     return token, response.Cookies()
