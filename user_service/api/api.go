@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"strconv"
 
+	// psgs "gophermart/db/postgres"
 	"gophermart/model"
 
 	"github.com/gin-gonic/gin"
@@ -41,21 +43,25 @@ func UserRegister(c *gin.Context) {
     err = c.ShouldBindBodyWithJSON(&user)
 
     if err != nil {
-        log.Printf("[/login]: Error on binding: %v\n", err)
+        log.Printf("[POST /register]: Error on binding: %v\n", err)
     }
 
-    userDB, err := model.NewUser(user)
+    var userDB = model.User{
+        Login: user.Login,
+        Password: user.Password,
+    }
+    err = userDB.Create(context.Background())
 
     switch {
-    case errors.Is(err, model.ErrDataBaseNotConnected):
-        log.Printf("[POST /register]: db not connected\n")
-        c.Status(http.StatusInternalServerError)
-        return
-    case errors.Is(err, model.ErrUserInvalidData):
+    case errors.Is(err, model.ErrInvalidData):
         log.Printf("[POST /register]: invalid input data: %+v\n", user)
         c.Status(http.StatusBadRequest)
         return
-    case errors.Is(err, model.ErrConstraintUniqueViolation):
+    case errors.Is(err, model.ErrDbNoAccess):
+        log.Printf("[POST /register]: db not connected\n")
+        c.Status(http.StatusInternalServerError)
+        return
+    case errors.Is(err, model.ErrAlreadyExist):
         log.Printf("[POST /register]: user already exist\n")
         c.Status(http.StatusConflict)
         return
@@ -85,24 +91,32 @@ func UserLogin(c *gin.Context) {
     err := c.ShouldBindBodyWithJSON(&user)
 
     if err != nil {
-        log.Printf("[/login]: Error on binding: %v\n", err)
+        log.Printf("[POST /login]: Error on binding: %v\n", err)
         c.Status(http.StatusBadRequest)
         return
     }
 
-    userDB, err := model.UserByCredentials(user)
+    var userDB = model.User{
+        Login: user.Login,
+        Password: user.Password,
+    }
+    err = userDB.ByCreadentials(context.Background())
 
     switch {
-    case errors.Is(err, model.ErrDataBaseNotConnected):
-        log.Printf("[POST /register]: db not connected\n")
-        c.Status(http.StatusInternalServerError)
-        return
-    case errors.Is(err, model.ErrUserInvalidData):
-        log.Printf("[POST /register]: invalid input data: %+v\n", user)
+    case errors.Is(err, model.ErrInvalidData):
+        log.Printf("[POST /login]: invalid input data: %+v\n", user)
         c.Status(http.StatusBadRequest)
         return
+    case errors.Is(err, model.ErrDbNoAccess):
+        log.Printf("[POST /login]: db not connected\n")
+        c.Status(http.StatusInternalServerError)
+        return
+    case errors.Is(err, model.ErrDoesNotExist):
+        log.Printf("[POST /login]: User does not exist\n")
+        c.Status(http.StatusUnauthorized)
+        return
     case errors.Is(err, model.ErrUnknown):
-        log.Printf("[POST /register]: Unknown error: %q\n", err)
+        log.Printf("[POST /login]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
     }
@@ -143,24 +157,29 @@ func UserDelete(c *gin.Context) {
     err = c.ShouldBindBodyWithJSON(&user)
 
     if err != nil {
-        log.Printf("[/login]: Error on binding: %v\n", err)
+        log.Printf("[DELETE /user]: Error on binding: %v\n", err)
         c.Status(http.StatusBadRequest)
         return
     }
 
-    userDB, err := model.UserByCredentials(user)
+    var userDB = model.User{
+        ID: userID,
+        Login: user.Login,
+        Password: user.Password,
+    }
+    err = userDB.ByCreadentials(context.Background())
 
     switch {
-    case errors.Is(err, model.ErrDataBaseNotConnected):
-        log.Printf("[POST /register]: db not connected\n")
+    case errors.Is(err, model.ErrDbNoAccess):
+        log.Printf("[DELETE /user]: db not connected\n")
         c.Status(http.StatusInternalServerError)
         return
-    case errors.Is(err, model.ErrUserInvalidData):
-        log.Printf("[POST /register]: invalid input data: %+v\n", user)
+    case errors.Is(err, model.ErrInvalidData):
+        log.Printf("[DELETE /user]: invalid user-input data\n")
         c.Status(http.StatusBadRequest)
         return
     case errors.Is(err, model.ErrUnknown):
-        log.Printf("[POST /register]: Unknown error: %q\n", err)
+        log.Printf("[DELETE /user]: Unknown error: %q\n", err)
         c.Status(http.StatusInternalServerError)
         return
     }
@@ -171,7 +190,7 @@ func UserDelete(c *gin.Context) {
         return
     }
 
-    err = model.DeleteUserById(userID)
+    err = userDB.DeleteByID(context.Background())
 
     if err != nil {
         log.Printf("[DELETE /user]: error from model.DeleteUser: %q\n", err)
@@ -211,25 +230,32 @@ func NewOrder(c *gin.Context) {
     }
 
     orderString := string(bodyBytes)
-    err = model.NewOrder(orderString, userID)
+    var order = model.Order{
+        Number: orderString,
+        UserID: userID,
+    }
+    err = order.Create(context.Background())
 
     switch {
-    case errors.Is(err, model.ErrDataBaseNotConnected):
+    case errors.Is(err, model.ErrDbNoAccess):
         log.Printf("[POST /orders]: db not connected\n")
         c.Status(http.StatusInternalServerError)
-    case errors.Is(err, model.ErrOrderInvalidNumber):
+        return
+    case errors.Is(err, model.ErrInvalidData):
         log.Printf("[POST /orders]: invalid input: %q\n", orderString)
         c.Status(http.StatusBadRequest)
-    case errors.Is(err, model.ErrConstraintUniqueViolation):
+        return
+    case errors.Is(err, model.ErrAlreadyExist):
         log.Printf("[POST /orders]: already exist\n")
         c.Status(http.StatusOK)
+        return
     case errors.Is(err, model.ErrUnknown):
         log.Printf("[POST /orders]: Unknown err: %q\n", err)
         c.Status(http.StatusInternalServerError)
-
-    default:
-        c.Status(http.StatusAccepted)
+        return
     }
+
+    c.Status(http.StatusAccepted)
 }
 
 func AllOrders(c *gin.Context) {
@@ -249,14 +275,17 @@ func AllOrders(c *gin.Context) {
         return
     }
 
-    orders, err := model.OrdersRelated(userID)
+    var order = model.Order{
+        UserID: userID,
+    }
+    orders, err := order.BelongsToUser(context.Background())
 
     switch {
-    case errors.Is(err, model.ErrDataBaseNotConnected):
-        log.Printf("[POST /orders]: db not connected\n")
+    case errors.Is(err, model.ErrDbNoAccess):
+        log.Printf("[GET /orders]: db not connected\n")
         c.Status(http.StatusInternalServerError)
     case errors.Is(err, model.ErrUnknown):
-        log.Printf("[POST /orders]: Unknown err: %q\n", err)
+        log.Printf("[GET /orders]: Unknown err: %q\n", err)
         c.Status(http.StatusInternalServerError)
     }
 
