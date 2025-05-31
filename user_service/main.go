@@ -1,13 +1,15 @@
 package main
 
 import (
+	"gophermart/api"
+	"gophermart/middleware"
 	"log"
-    "gophermart/api"
-    "gophermart/middleware"
+	"os"
+
+	_ "gophermart/docs"
 
 	"github.com/gin-gonic/gin"
-    _ "gophermart/docs"
-    swaggerFiles "github.com/swaggo/files"
+	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
@@ -16,6 +18,7 @@ import (
 
 func main() {
     router := gin.Default()
+    router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
     apiGroup := router.Group("/api")
     userGroup := apiGroup.Group("/user")
@@ -29,7 +32,6 @@ func main() {
     UserAuthGroup.POST("/orders", api.NewOrder)
     UserAuthGroup.GET("/orders", api.AllOrders)
 
-    log.Println("[SERVER]: listen at:", ":8080")
-    router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+    log.Printf("[SERVER]: listen at: :%s\n", os.Getenv("PORT"))
     router.Run() 
 }
