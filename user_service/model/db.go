@@ -3,28 +3,14 @@ package model
 import (
 	"errors"
 	"fmt"
-	db "gophermart/model/postgres"
+	db "gophermart/db/postgres"
 	"log"
-	"os"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	// pgx
-	// sqlc - https://github.com/sqlc-dev/sqlc
-	// https://github.com/doug-martin/goqu
-	// migrations
 )
 
 var (
-	config = &db.DbConfig{
-		Host:     os.Getenv("DB_HOST"),
-		User:     os.Getenv("DB_USER"),
-		Password: os.Getenv("DB_PASS"),
-		DbName:   os.Getenv("DB_DB"),
-		Port:     os.Getenv("DB_PORT"),
-		TimeZone: "Asia/Yekaterinburg",
-	}
-
 	dbObj *pgx.Conn
 
     ErrDataBaseNotConnected = errors.New("database is not connected")
@@ -43,11 +29,11 @@ func init() {
 // connect to postgres
 func connectToPostgres() {
 	var err error
-	dbObj, err = db.Connect(config)
+	dbObj, err = db.Connect(db.DefaultConfig)
 
 	if err != nil {
 		if errors.Is(err, db.ErrInvalidConfig) {
-			log.Printf("[db]: Config is invalid: %q\n", config)
+			log.Printf("[db]: Config is invalid: %q\n", db.DefaultConfig)
             return
 		}
         // need to process other errors
