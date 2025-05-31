@@ -27,6 +27,7 @@ services:
       DB_HOST: $DB_HOST
       DB_PORT: $DB_PORT
       JWT_SECRET_KEY: $JWT_SECRET_KEY
+      PORT: $PORT
     hostname: gophermart
     ports:
       - "8080:8080"
